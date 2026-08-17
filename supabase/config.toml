@@ -28,15 +28,20 @@ port = 54323
 
 [auth]
 enabled = true
-site_url = "http://localhost:3000"
-additional_redirect_urls = ["http://localhost:3000/login"]
+site_url = "http://localhost:6001"
+additional_redirect_urls = ["http://localhost:6001/login"]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
-enable_signup = false            # ผู้ใช้ถูกสร้างโดย super_admin ผ่าน POST /api/users เท่านั้น
+# ปิดการสมัครเองจากภายนอก — ผู้ใช้ถูกสร้างโดย super_admin ผ่าน POST /api/users เท่านั้น
+# (admin API ข้อจำกัดนี้ไม่โดน)
+enable_signup = false
 
 [auth.email]
-enable_signup = false
+# ⚠️ ค่านี้ = "เปิด/ปิด provider อีเมลทั้งตัว" ไม่ใช่แค่การสมัครเอง
+#    ตั้ง false เมื่อไหร่ → login ด้วยอีเมล/รหัสผ่านพังทันที (GoTrue ตอบ email_provider_disabled)
+#    การกันสมัครเองทำที่ [auth] enable_signup ข้างบนแล้ว
+enable_signup = true
 enable_confirmations = false
 
 [storage]

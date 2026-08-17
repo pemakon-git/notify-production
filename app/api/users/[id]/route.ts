@@ -12,7 +12,7 @@ import { parseBody } from '@/lib/http/validate';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export const GET = withPermission<{ id: string }>('users', 'read', async (_request, { params }) => {
+export const GET = withPermission<{ id: string }>('user', 'read', async (_request, { params }) => {
   const profile = await prisma.profile.findUnique({ where: { id: params.id } });
   if (!profile) throw notFound('ไม่พบผู้ใช้นี้');
 
@@ -20,7 +20,7 @@ export const GET = withPermission<{ id: string }>('users', 'read', async (_reque
 });
 
 export const PATCH = withPermission<{ id: string }>(
-  'users',
+  'user',
   'update',
   async (request, { auth, params }) => {
     const input = await parseBody(request, updateUserSchema);

@@ -48,22 +48,41 @@ beforeAll(async () => {
   await db.connect();
 
   // fixture: agent 2 คน / เจ้าของ 1 / lead 1 / ทรัพย์ available + draft
+  //
+  // profiles มี FK ไป auth.users (ตั้งใน policies.sql) — บน Supabase จริงจึงต้องสร้าง
+  // auth user ก่อน · บน Postgres เปล่า (ไม่มี schema auth) FK ถูกข้าม บล็อกนี้จึงไม่ทำอะไร
+  const hasAuthSchema = await db.query<{ exists: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.tables WHERE table_schema = 'auth' AND table_name = 'users'
+     ) AS exists`,
+  );
+
+  if (firstRow(hasAuthSchema.rows).exists) {
+    await db.query(
+      `INSERT INTO auth.users (instance_id, id, aud, role, email)
+       VALUES ('00000000-0000-0000-0000-000000000000', $1, 'authenticated', 'authenticated', 'agent-a@test.local'),
+              ('00000000-0000-0000-0000-000000000000', $2, 'authenticated', 'authenticated', 'agent-b@test.local')
+       ON CONFLICT (id) DO NOTHING`,
+      [AGENT_A, AGENT_B],
+    );
+  }
+
   await db.query(
-    `INSERT INTO profiles (id, email, first_name, last_name, role)
-     VALUES ($1, 'agent-a@test.local', 'A', 'Agent', 'sales_agent'),
-            ($2, 'agent-b@test.local', 'B', 'Agent', 'sales_agent')
+    `INSERT INTO profiles (id, email, full_name, role)
+     VALUES ($1, 'agent-a@test.local', 'Agent A', 'sales_agent'),
+            ($2, 'agent-b@test.local', 'Agent B', 'sales_agent')
      ON CONFLICT (id) DO NOTHING`,
     [AGENT_A, AGENT_B],
   );
 
   await db.query(
-    `INSERT INTO owners (id, first_name, last_name, phone)
-     VALUES ($1, 'สมชาย', 'ทดสอบ', '0800000000') ON CONFLICT (id) DO NOTHING`,
+    `INSERT INTO owners (id, full_name, phone)
+     VALUES ($1, 'สมชาย ทดสอบ', '0800000000') ON CONFLICT (id) DO NOTHING`,
     [OWNER],
   );
 
   await db.query(
-    `INSERT INTO properties (id, code, type, owner_id, title_th, province, district, rent_price, status)
+    `INSERT INTO properties (id, code, property_type, owner_id, title_th, province, district, monthly_rent, status)
      VALUES ($1, 'TEST-AV-1', 'condo', $3, 'ทรัพย์เผยแพร่แล้ว', 'กรุงเทพมหานคร', 'วัฒนา', 20000, 'available'),
             ($2, 'TEST-DR-1', 'condo', $3, 'ทรัพย์ร่าง', 'กรุงเทพมหานคร', 'วัฒนา', 15000, 'draft')
      ON CONFLICT (id) DO NOTHING`,
@@ -71,8 +90,8 @@ beforeAll(async () => {
   );
 
   await db.query(
-    `INSERT INTO leads (id, code, name, phone, source)
-     VALUES ($1, 'TEST-LD-1', 'ลูกค้าทดสอบ', '0811111111', 'web') ON CONFLICT (id) DO NOTHING`,
+    `INSERT INTO leads (id, code, full_name, phone, source)
+     VALUES ($1, 'TEST-LD-1', 'ลูกค้าทดสอบ', '0811111111', 'public_web') ON CONFLICT (id) DO NOTHING`,
     [LEAD],
   );
 
@@ -90,13 +109,13 @@ function insertAppointment(
   agentId: string,
   startIso: string,
   minutes: number,
-  status = 'pending',
+  status = 'upcoming',
   endsAtOverride?: string,
 ): Promise<unknown> {
   const endsAt = endsAtOverride ?? new Date(new Date(startIso).getTime() + minutes * 60_000).toISOString();
 
   return db.query(
-    `INSERT INTO appointments (id, code, lead_id, agent_id, scheduled_at, duration_minutes, ends_at, status)
+    `INSERT INTO appointments (id, code, lead_id, agent_id, scheduled_at, duration_min, ends_at, status)
      VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7)`,
     [code, LEAD, agentId, startIso, minutes, endsAt, status],
   );
@@ -142,7 +161,7 @@ describe.skipIf(!enabled)('นัดหมายห้ามชนกัน — 
         AGENT_B,
         '2026-09-02T10:00:00Z',
         60,
-        'pending',
+        'upcoming',
         '2026-09-02T09:00:00Z',
       ),
     ).rejects.toThrow(/appointments_ends_at_consistent/);
@@ -201,7 +220,7 @@ describe.skipIf(!enabled)('เอกสารต้องมี link ≥ 1 (spec
   it('insert เอกสารโดยไม่มี link → commit ไม่ผ่าน', async () => {
     await db.query('BEGIN');
     await db.query(
-      `INSERT INTO documents (id, type, name) VALUES (gen_random_uuid(), 'other', 'test:orphan')`,
+      `INSERT INTO documents (id, document_type, name) VALUES (gen_random_uuid(), 'other', 'test:orphan')`,
     );
 
     await expect(db.query('COMMIT')).rejects.toThrow(/must be linked to at least one entity/);
@@ -211,7 +230,7 @@ describe.skipIf(!enabled)('เอกสารต้องมี link ≥ 1 (spec
   it('insert เอกสาร + link ใน transaction เดียวกัน → ผ่าน (deferred ทำงานถูกต้อง)', async () => {
     await db.query('BEGIN');
     const { rows } = await db.query(
-      `INSERT INTO documents (id, type, name) VALUES (gen_random_uuid(), 'title_deed', 'test:linked') RETURNING id`,
+      `INSERT INTO documents (id, document_type, name) VALUES (gen_random_uuid(), 'title_deed', 'test:linked') RETURNING id`,
     );
     await db.query(
       `INSERT INTO document_links (document_id, entity_type, entity_id) VALUES ($1, 'property', $2)`,
@@ -272,7 +291,7 @@ describe.skipIf(!enabled)('RLS — สิ่งที่ anon เข้าถึ
     await db.query('SET LOCAL ROLE anon');
 
     await expect(
-      db.query(`UPDATE properties SET rent_price = 1 WHERE id = $1`, [PROP_AVAILABLE]),
+      db.query(`UPDATE properties SET monthly_rent = 1 WHERE id = $1`, [PROP_AVAILABLE]),
     ).rejects.toThrow(/permission denied/);
 
     await db.query('ROLLBACK');
@@ -280,36 +299,36 @@ describe.skipIf(!enabled)('RLS — สิ่งที่ anon เข้าถึ
 
   it('anon เห็นรูปของทรัพย์ที่เผยแพร่แล้วเท่านั้น', async () => {
     await db.query(
-      `INSERT INTO property_images (id, property_id, storage_key)
-       VALUES (gen_random_uuid(), $1, 'test/available.jpg'),
-              (gen_random_uuid(), $2, 'test/draft.jpg')`,
+      `INSERT INTO property_media (id, property_id, storage_key, media_type)
+       VALUES (gen_random_uuid(), $1, 'test/available.jpg', 'image'),
+              (gen_random_uuid(), $2, 'test/draft.jpg', 'image')`,
       [PROP_AVAILABLE, PROP_DRAFT],
     );
 
     await db.query('BEGIN');
     await db.query('SET LOCAL ROLE anon');
-    const { rows } = await db.query(`SELECT storage_key FROM property_images`);
+    const { rows } = await db.query(`SELECT storage_key FROM property_media`);
     await db.query('ROLLBACK');
 
     const keys = rows.map((row: { storage_key: string }) => row.storage_key);
     expect(keys).toContain('test/available.jpg');
     expect(keys).not.toContain('test/draft.jpg');
 
-    await db.query(`DELETE FROM property_images WHERE storage_key LIKE 'test/%'`);
+    await db.query(`DELETE FROM property_media WHERE storage_key LIKE 'test/%'`);
   });
 });
 
 describe.skipIf(!enabled)('next_code_seq — ออกเลขไม่ซ้ำ (spec 4.2/4.5/4.6/4.8)', () => {
   it('เลขเดินต่อเนื่องต่อ (scope, year)', async () => {
-    const first = await db.query<{ seq: number }>(`SELECT next_code_seq('TEST', 2026) AS seq`);
-    const second = await db.query<{ seq: number }>(`SELECT next_code_seq('TEST', 2026) AS seq`);
+    const first = await db.query<{ seq: number }>(`SELECT next_code_seq('TST', 2026) AS seq`);
+    const second = await db.query<{ seq: number }>(`SELECT next_code_seq('TST', 2026) AS seq`);
 
     expect(firstRow(second.rows).seq).toBe(firstRow(first.rows).seq + 1);
   });
 
   it('แยก scope และแยกปีจากกัน', async () => {
-    const a = await db.query<{ seq: number }>(`SELECT next_code_seq('TEST_OTHER', 2026) AS seq`);
-    const b = await db.query<{ seq: number }>(`SELECT next_code_seq('TEST', 2027) AS seq`);
+    const a = await db.query<{ seq: number }>(`SELECT next_code_seq('TOTH', 2026) AS seq`);
+    const b = await db.query<{ seq: number }>(`SELECT next_code_seq('TST', 2027) AS seq`);
 
     expect(firstRow(a.rows).seq).toBe(1);
     expect(firstRow(b.rows).seq).toBe(1);
@@ -327,7 +346,7 @@ describe.skipIf(!enabled)('next_code_seq — ออกเลขไม่ซ้�
     try {
       const results = await Promise.all(
         clients.map((client) =>
-          client.query<{ seq: number }>(`SELECT next_code_seq('TEST_CONCURRENT', 2026) AS seq`),
+          client.query<{ seq: number }>(`SELECT next_code_seq('TCON', 2026) AS seq`),
         ),
       );
 
@@ -336,7 +355,7 @@ describe.skipIf(!enabled)('next_code_seq — ออกเลขไม่ซ้�
       expect(seqs).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     } finally {
       await Promise.all(clients.map((client) => client.end()));
-      await db.query(`DELETE FROM code_sequences WHERE scope LIKE 'TEST%'`);
+      await db.query(`DELETE FROM code_sequences WHERE scope IN ('TST','TOTH','TCON')`);
     }
   });
 });

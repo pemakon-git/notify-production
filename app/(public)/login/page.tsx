@@ -1,10 +1,15 @@
 import type { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
 import { LoginForm } from '@/components/public/login-form';
 
-export const metadata: Metadata = {
-  title: 'เข้าสู่ระบบ',
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('login');
+
+  return {
+    title: t('title'),
+    robots: { index: false, follow: false },
+  };
+}
 
 /**
  * หน้า login อยู่ใน route group (public) เพราะคนที่ยังไม่ login ต้องเข้าถึงได้
@@ -16,12 +21,13 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
+  const t = await getTranslations('login');
 
   return (
-    <div className="mx-auto flex max-w-sm flex-col gap-6 py-16">
+    <div className="wrap flex max-w-md flex-col gap-6 py-20">
       <div>
-        <h1 className="text-2xl font-semibold">เข้าสู่ระบบ</h1>
-        <p className="mt-1 text-sm text-slate-600">สำหรับพนักงานเท่านั้น</p>
+        <h1 className="text-3xl font-semibold tracking-tightish">{t('title')}</h1>
+        <p className="mt-1 text-sm text-v2-muted">{t('subtitle')}</p>
       </div>
 
       <LoginForm nextPath={next} />

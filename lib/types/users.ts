@@ -9,7 +9,7 @@ export const thaiPhoneSchema = z
   .regex(/^(0\d{8,9}|\+66\d{8,9})$/, 'รูปแบบเบอร์โทรไม่ถูกต้อง');
 
 /** เลขบัตรประชาชน 13 หลัก + ตรวจ checksum หลักสุดท้าย */
-export const nationalIdSchema = z
+export const idCardSchema = z
   .string()
   .trim()
   .regex(/^\d{13}$/, 'เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก')
@@ -21,16 +21,20 @@ export const nationalIdSchema = z
     return (11 - (sum % 11)) % 10 === Number(value[12]);
   }, 'เลขบัตรประชาชนไม่ถูกต้อง (checksum ไม่ผ่าน)');
 
+/**
+ * โปรไฟล์ผู้ใช้ — ระบบเดิมเก็บ `fullName` ช่องเดียว (ไม่แยก first/last)
+ * UI ทุกหน้าจึงแสดงชื่อเต็มตรงๆ
+ */
 export const profileSchema = z.object({
   id: z.string().uuid(),
   email: z.string().email(),
-  firstName: z.string(),
-  lastName: z.string(),
+  fullName: z.string(),
   phone: z.string().nullable(),
   role: roleSchema,
-  teamId: z.string().uuid().nullable(),
   status: userStatusSchema,
   language: languageSchema,
+  teamId: z.string().uuid().nullable(),
+  branchId: z.string().uuid().nullable(),
   createdAt: z.string(),
 });
 export type Profile = z.infer<typeof profileSchema>;
@@ -38,24 +42,24 @@ export type Profile = z.infer<typeof profileSchema>;
 export const createUserSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   password: z.string().min(12, 'รหัสผ่านต้องยาวอย่างน้อย 12 ตัวอักษร'),
-  firstName: z.string().trim().min(1),
-  lastName: z.string().trim().min(1),
+  fullName: z.string().trim().min(1),
   phone: thaiPhoneSchema.optional(),
   role: roleSchema,
   teamId: z.string().uuid().optional(),
-  language: languageSchema.default('th'),
+  branchId: z.string().uuid().optional(),
+  language: languageSchema.default('en'),
 });
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 
 export const updateUserSchema = z
   .object({
-    firstName: z.string().trim().min(1).optional(),
-    lastName: z.string().trim().min(1).optional(),
+    fullName: z.string().trim().min(1).optional(),
     phone: thaiPhoneSchema.nullable().optional(),
     role: roleSchema.optional(),
-    teamId: z.string().uuid().nullable().optional(),
     status: userStatusSchema.optional(),
     language: languageSchema.optional(),
+    teamId: z.string().uuid().nullable().optional(),
+    branchId: z.string().uuid().nullable().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, 'ต้องส่งอย่างน้อย 1 field');
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;

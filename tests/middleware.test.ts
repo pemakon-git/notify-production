@@ -21,7 +21,7 @@ function requestFor(
   path: string,
   init: { bearer?: string; sessionCookie?: boolean } = {},
 ): NextRequest {
-  const request = new NextRequest(new URL(path, 'http://localhost:3000'), {
+  const request = new NextRequest(new URL(path, 'http://localhost:6001'), {
     headers: init.bearer ? { authorization: `Bearer ${init.bearer}` } : undefined,
   });
 

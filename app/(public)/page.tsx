@@ -1,16 +1,30 @@
+import Link from 'next/link';
+
 /**
- * หน้าแรกฝั่งลูกค้า — เนื้อหาจริง (listing + ฟอร์มนัดดู) อยู่ใน milestone 12
+ * หน้าแรกฝั่งลูกค้า — โครง hero ตามดีไซน์ v2 (H1 ใหญ่ · ปุ่ม pill คู่)
+ * section ที่เหลือ (Featured · Cities · Steps · Fresh · Testimonials · Stats · Insights)
+ * อยู่ในรอบพอร์ตฝั่งลูกค้า
  */
 export default function HomePage() {
   return (
-    <div className="flex flex-col gap-4 py-12">
-      <p className="text-sm font-medium uppercase tracking-wider text-slate-500">public</p>
-      <h1 className="text-3xl font-semibold">ค้นหาทรัพย์ให้เช่า</h1>
-      <p className="max-w-prose text-slate-600">
-        โครงพร้อมแล้ว — หน้า listing อ่านตรงจาก Supabase ผ่าน RLS (เห็นเฉพาะทรัพย์ที่เผยแพร่แล้ว)
-        และฟอร์มนัดดูยิงไป <code className="rounded bg-slate-100 px-1">/api/public/appointments</code>{' '}
-        ตาม milestone 12
+    <section className="wrap py-20 sm:py-28">
+      <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tightish sm:text-5xl lg:text-6xl">
+        Your dream home, just a step away
+      </h1>
+
+      <p className="mt-5 max-w-xl text-v2-body">
+        Find condos, houses, townhomes and apartments for rent — and book a viewing with our team in
+        minutes.
       </p>
-    </div>
+
+      <div className="mt-8 flex flex-wrap gap-3">
+        <Link href="/properties" className="btn-dark">
+          Explore properties
+        </Link>
+        <Link href="/book" className="btn-outline">
+          Book a visit
+        </Link>
+      </div>
+    </section>
   );
 }

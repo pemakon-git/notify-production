@@ -2,10 +2,219 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ══════════════════════════════════════════════════════════════════════════
+   Design tokens — ยกมาจากระบบดีไซน์เดิมของโปรเจกต์ (ไม่ redesign ไม่เดาค่า)
+
+   ที่มา:
+     ฝั่งพนักงาน (admin) = tailwind.preset.cjs + web-admin/globals.css  ← DESIGN-SYSTEM.md ล็อกไว้
+     ฝั่งลูกค้า  (v2)     = web-v2/tailwind.config.ts + web-v2/globals.css ← override lock เฉพาะ v2
+
+   ทั้งสองชุดตั้งใจให้ต่างกัน: admin = gold accent อบอุ่น ปุ่ม rounded-lg มี dark mode
+   / v2 = ขาว-ดำ minimal ปุ่ม pill ฟอนต์ Manrope ไม่มี dark mode
+   ในแอปเดียวจึงแยกด้วย scope: token admin อยู่ระดับ :root · token v2 อยู่ใต้ `.ui-v2`
+   ที่ครอบเฉพาะ route group (public)
+
+   กฎเหล็กจาก DESIGN-SYSTEM.md §1-§4: ห้ามใช้ค่า arbitrary (text-[13px], p-[7px],
+   rounded-[10px]) ในคอมโพเนนต์ — ถ้าต้องใช้ค่าใหม่ ให้เพิ่ม token ที่ไฟล์นี้ก่อน
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── ฝั่งพนักงาน: light (ค่าเดิมเป๊ะ) ─────────────────────────────────────── */
 :root {
-  --font-sans: 'Noto Sans Thai', 'Inter';
+  --c-ink: 26 26 26; /* #1A1A1A */
+  --c-ink-soft: 68 64 60; /* #44403C */
+  --c-gold: 184 153 104; /* #B89968 — accent เดียวของฝั่ง admin */
+  --c-gold-dark: 140 110 66; /* #8C6E42 — role "text" ผ่าน AA 4.5 บนพื้น light */
+  --c-gold-light: 196 163 90; /* #C4A35A */
+  --c-surface: 253 253 252; /* #FDFDFC การ์ด */
+  --c-canvas: 250 250 249; /* #FAFAF9 พื้นหลังหน้า */
+  --c-raised: 245 244 240; /* #F5F4F0 ยกชั้น/nested */
+  --c-border: 231 229 226; /* #E7E5E2 */
+  --c-border-strong: 214 210 203; /* เน้น/hover */
+  --c-muted: 120 113 108; /* #78716C */
+  --c-faint: 168 162 158; /* #A8A29E */
+  --c-success: 46 125 91; /* #2E7D5B */
+  --c-warning: 183 121 31; /* #B7791F */
+  --c-danger: 180 65 60; /* #B4413C */
+  --c-info: 59 110 143; /* #3B6E8F */
+  color-scheme: light;
 }
 
-html {
-  color-scheme: light dark;
+/* ── ฝั่งพนักงาน: dark v2 (near-black อุ่น · การ์ดต่างจากพื้นด้วย "กรอบ" ไม่ใช่ความสว่าง) ── */
+.dark {
+  --c-ink: 236 234 228; /* #ECEAE4 */
+  --c-ink-soft: 178 173 165;
+  --c-gold: 200 169 106; /* #C8A96A */
+  --c-gold-dark: 214 185 128; /* ในมืด accent text สว่างขึ้น */
+  --c-gold-light: 224 197 148;
+  --c-surface: 27 26 24; /* #1B1A18 */
+  --c-canvas: 20 19 18; /* #141312 */
+  --c-raised: 38 36 33; /* #262421 */
+  --c-border: 48 46 42; /* #302E2A */
+  --c-border-strong: 64 60 54; /* #403C36 */
+  --c-muted: 156 151 142;
+  --c-faint: 106 101 93;
+  --c-success: 111 181 138;
+  --c-warning: 214 162 94;
+  --c-danger: 226 117 99;
+  --c-info: 123 163 201;
+  color-scheme: dark;
+}
+
+@layer base {
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+    font-feature-settings: 'liga' 1, 'calt' 1;
+  }
+
+  /* เลี่ยง content ล้นจอเล็ก */
+  * {
+    min-width: 0;
+  }
+
+  /* a11y: โฟกัสด้วยคีย์บอร์ดเห็นชัดทุก control (ไม่ขึ้นตอนคลิกเมาส์) */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible,
+  [role='button']:focus-visible {
+    outline: 2px solid #b89968;
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  /* ── ฝั่งลูกค้า (v2): base typography ต่างจาก admin จึง scope ไว้ใต้ .ui-v2 ──
+     ค่าจาก audit DOM สด: body 18/1.4/#333 · หัวข้อ #111 letter-spacing -0.01em */
+  .ui-v2 {
+    @apply bg-v2-surface font-display text-v2-body;
+    font-size: 18px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .ui-v2 :is(h1, h2, h3, h4) {
+    @apply text-v2-ink;
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer components {
+  /* ─────────────── ฝั่งพนักงาน (admin) ─────────────── */
+
+  /* badge/chip = ป้ายอะตอม 1 บรรทัดเสมอ (nowrap) — label ที่มีช่องว่าง เช่น "ว่าง · ลงประกาศ"
+     จะได้ไม่ wrap ตกกรอบในคอลัมน์แคบ (iPad/มือถือ) */
+  .badge {
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  /* การ์ดแบน อาศัย "กรอบ" นิยามขอบ (ไม่พึ่งเงา) */
+  .card {
+    @apply rounded-card border border-border bg-surface;
+  }
+
+  /* ปุ่ม — h-11 (44px เกณฑ์ Apple) · กดแล้วยุบเล็กน้อยให้รู้สึกตอบสนอง
+     ⛔ ห้าม rounded-full กับปุ่ม/แท็บ/การ์ด (DESIGN-SYSTEM §3) */
+  .btn {
+    @apply inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium transition active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100;
+  }
+  .btn-gold {
+    @apply btn bg-gold text-[#1c1b18] hover:bg-gold-light;
+  }
+  .btn-ghost {
+    @apply btn border border-border bg-transparent text-ink hover:border-border-strong hover:bg-raised;
+  }
+  .btn-danger {
+    @apply btn bg-danger text-white hover:bg-danger/90;
+  }
+  /* size modifier ต้องอยู่หลัง color variants — ไม่งั้น h-11 จาก .btn ทับ h-9 */
+  .btn-sm {
+    @apply h-9 px-3 text-sm;
+  }
+
+  /* ช่องกรอก: 16px บนมือถือ (กัน iOS auto-zoom ตอน focus) → 14px จอ ≥sm */
+  .field {
+    @apply h-11 w-full rounded-lg border border-border bg-canvas px-3 text-base outline-none focus:border-gold focus:ring-2 focus:ring-gold/20 sm:text-sm;
+  }
+
+  /* segmented filter (เลือกได้ทีละอัน) — มือถือแคบลงให้ 5 ตัวเลือกพอดี 375px */
+  .seg {
+    @apply inline-flex rounded-lg border border-border bg-canvas p-0.5 text-[13px] sm:text-sm;
+  }
+  .seg-item {
+    @apply rounded-md px-2.5 py-1.5 font-medium text-muted transition sm:px-3;
+  }
+  .seg-item-on {
+    @apply bg-raised text-ink shadow-sm ring-1 ring-border;
+  }
+
+  /* ─────────────── ฝั่งลูกค้า (v2) ─────────────── */
+
+  /* container กลาง */
+  .wrap {
+    @apply mx-auto w-full max-w-content px-5 sm:px-8;
+  }
+  /* ปุ่ม pill ดำ = ปุ่มหลักฝั่งลูกค้า (ต่างจาก admin โดยเจตนา) */
+  .btn-dark {
+    @apply inline-flex items-center justify-center rounded-pill bg-v2-ink px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90;
+  }
+  /* ปุ่ม pill เส้น = ปุ่มรอง */
+  .btn-outline {
+    @apply inline-flex items-center justify-center rounded-pill border border-v2-ink bg-transparent px-6 py-3 text-sm font-semibold text-v2-ink transition hover:bg-v2-ink hover:text-white;
+  }
+}
+
+@layer utilities {
+  /* เนื้อหาเข้าจอแบบ fade + ยกเบาๆ
+     fill = backwards (ไม่ใช่ both): transform ที่ค้างไว้—even identity—จะกลายเป็น
+     containing block ดักจับ position:fixed ทำให้ modal/overlay ไม่เต็มจอ */
+  @keyframes fade-rise {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .animate-fade-rise {
+    animation: fade-rise 0.28s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  /* scroll reveal ฝั่งลูกค้า (Framer-style appear-on-scroll) */
+  .reveal {
+    opacity: 0;
+    transform: translateY(22px);
+    transition:
+      opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity, transform;
+  }
+  .reveal-in {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-rise,
+    .animate-fade-in,
+    .animate-modal-in {
+      animation: none;
+    }
+    .reveal {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+}
+
+/* touch target ≥40px บนอุปกรณ์สัมผัส (เกณฑ์ Apple 44 / Material 48)
+   — เดสก์ท็อปเมาส์คงปุ่มกระชับ 36px */
+@media (any-pointer: coarse) {
+  .btn-sm {
+    height: 2.5rem;
+  }
 }

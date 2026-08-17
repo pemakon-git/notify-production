@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic';
 
 const querySchema = paginationQuerySchema.merge(listUsersQuerySchema);
 
-export const GET = withPermission('users', 'read', async (request) => {
+export const GET = withPermission('user', 'read', async (request) => {
   const { page, perPage, role, status, search } = parseQuery(request, querySchema);
 
   const where: Prisma.ProfileWhereInput = {
@@ -29,8 +29,7 @@ export const GET = withPermission('users', 'read', async (request) => {
     ...(search
       ? {
           OR: [
-            { firstName: { contains: search, mode: 'insensitive' } },
-            { lastName: { contains: search, mode: 'insensitive' } },
+            { fullName: { contains: search, mode: 'insensitive' } },
             { email: { contains: search, mode: 'insensitive' } },
           ],
         }
@@ -50,7 +49,7 @@ export const GET = withPermission('users', 'read', async (request) => {
   return listJson<ProfileDto>(rows.map(serializeProfile), buildListMeta(total, page, perPage));
 });
 
-export const POST = withPermission('users', 'create', async (request, { auth }) => {
+export const POST = withPermission('user', 'create', async (request, { auth }) => {
   const input = await parseBody(request, createUserSchema);
 
   // spec rule #7 — ตั้ง role ได้เฉพาะที่ต่ำกว่าตัวเอง
@@ -79,11 +78,11 @@ export const POST = withPermission('users', 'create', async (request, { auth }) 
         data: {
           id: data.user.id,
           email: input.email,
-          firstName: input.firstName,
-          lastName: input.lastName,
+          fullName: input.fullName,
           phone: input.phone ?? null,
           role: input.role,
           teamId: input.teamId ?? null,
+          branchId: input.branchId ?? null,
           language: input.language,
         },
       });
@@ -96,8 +95,7 @@ export const POST = withPermission('users', 'create', async (request, { auth }) 
         newValue: {
           email: created.email,
           role: created.role,
-          firstName: created.firstName,
-          lastName: created.lastName,
+          fullName: created.fullName,
         },
       });
 

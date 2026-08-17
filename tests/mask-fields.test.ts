@@ -14,33 +14,33 @@ describe('field masking (spec 3.2)', () => {
   });
 
   it('property_manager / sales_agent เห็นเลขบัตรแบบ mask', () => {
-    const owner = { id: 'o1', firstName: 'สมชาย', nationalId: '1234567890123' };
+    const owner = { id: 'o1', firstName: 'สมชาย', idCardNo: '1234567890123' };
 
-    expect(applyFieldMask('property_manager', 'owners', owner).nationalId).toBe('••••0123');
-    expect(applyFieldMask('sales_agent', 'owners', owner).nationalId).toBe('••••0123');
+    expect(applyFieldMask('property_manager', 'owner', owner).idCardNo).toBe('••••0123');
+    expect(applyFieldMask('sales_agent', 'owner', owner).idCardNo).toBe('••••0123');
   });
 
   it('super_admin ไม่ถูก mask (ค่าเต็มยังต้องมาจาก endpoint ที่ log audit เท่านั้น)', () => {
-    const owner = { id: 'o1', nationalId: '1234567890123' };
-    expect(applyFieldMask('super_admin', 'owners', owner).nationalId).toBe('1234567890123');
+    const owner = { id: 'o1', idCardNo: '1234567890123' };
+    expect(applyFieldMask('super_admin', 'owner', owner).idCardNo).toBe('1234567890123');
   });
 
   it('mask ใน array ได้ (list response)', () => {
-    const rows = [{ nationalId: '1111111111111' }, { nationalId: '2222222222222' }];
-    const masked = applyFieldMask('sales_agent', 'owners', rows);
+    const rows = [{ idCardNo: '1111111111111' }, { idCardNo: '2222222222222' }];
+    const masked = applyFieldMask('sales_agent', 'owner', rows);
 
-    expect(masked.map((row) => row.nationalId)).toEqual(['••••1111', '••••2222']);
+    expect(masked.map((row) => row.idCardNo)).toEqual(['••••1111', '••••2222']);
   });
 
   it('ไม่แก้ payload ต้นฉบับ (ไม่มี side-effect)', () => {
-    const owner = { nationalId: '1234567890123' };
-    applyFieldMask('sales_agent', 'owners', owner);
+    const owner = { idCardNo: '1234567890123' };
+    applyFieldMask('sales_agent', 'owner', owner);
 
-    expect(owner.nationalId).toBe('1234567890123');
+    expect(owner.idCardNo).toBe('1234567890123');
   });
 
   it('resource ที่ไม่มี maskedFields ส่งกลับตามเดิม', () => {
     const lead = { name: 'สมหญิง', phone: '0812345678' };
-    expect(applyFieldMask('sales_agent', 'leads', lead)).toEqual(lead);
+    expect(applyFieldMask('sales_agent', 'lead', lead)).toEqual(lead);
   });
 });

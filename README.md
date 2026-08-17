@@ -1,4 +1,4 @@
-# Property Rental Management System
+# Notify — Property Rental Management System
 
 ระบบจัดการเช่าอสังหาริมทรัพย์ — implement ตาม [property-management-spec.md](property-management-spec.md)
 
@@ -51,11 +51,10 @@ supabase/config.toml  ตั้งค่า Supabase local (`supabase start`)
 | DB | Supabase Postgres 15 + Prisma 6 (ต่อผ่าน pooler port 6543) |
 | Auth | Supabase Auth (GoTrue) + `@supabase/ssr` — session เป็น httpOnly cookie |
 | Authorization | policy table เอง (resource × action × role + field masking) |
-| Validation | Zod — ที่ route handler คือตัวจริง, ที่ฟอร์มคือ UX เสริม |
-| UI | Tailwind CSS + TanStack Query/Table + react-hook-form + next-intl (th/en) |
+| i18n | next-intl cookie-based — **default EN** สลับไทยได้ (959 key × 2 ภาษา) |
+| UI | Tailwind + design token ที่ล็อกไว้ (admin = gold / ลูกค้า = ขาว-ดำ) + component library 26 ตัว |
 | Storage | Supabase Storage — `property-images` (public) / `documents` (private) |
 | Schedule | Vercel Cron → `/api/cron/*` (ตรวจ `CRON_SECRET`) |
-| Rate limit | Upstash Redis — ใช้กับ `/api/public/*` เท่านั้น |
 | Test | Vitest (unit + integration กับ Postgres จริง) |
 
 ## เริ่มใช้งาน
@@ -71,7 +70,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 # 2) เตรียม DB (migrate → RLS/constraint/trigger → seed 3 role)
 npm run db:setup
 
-# 3) รัน (http://localhost:3000)
+# 3) รัน (http://localhost:6001)
 npm run dev
 ```
 

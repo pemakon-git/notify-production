@@ -11,7 +11,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export const GET = withPermission<{ id: string }>(
-  'users',
+  'user',
   'read',
   async (_request, { auth, params }) => {
     const exists = await prisma.profile.findUnique({
@@ -43,7 +43,7 @@ export const GET = withPermission<{ id: string }>(
 
 /** เพิกถอนทุก session ของ user (ปุ่ม "ออกจากระบบทุกอุปกรณ์") */
 export const DELETE = withPermission<{ id: string }>(
-  'users',
+  'user',
   'update',
   async (_request, { auth, params }) => {
     const exists = await prisma.profile.findUnique({

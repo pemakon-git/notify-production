@@ -31,7 +31,19 @@ const PUBLIC_API_PREFIXES = [
 ];
 
 /** หน้าเว็บฝั่งลูกค้า — เข้าได้โดยไม่ login */
-const PUBLIC_PAGE_PREFIXES = ['/properties', '/book', '/login', '/search'];
+const PUBLIC_PAGE_PREFIXES = [
+  '/properties',
+  '/property',
+  '/book',
+  '/login',
+  '/about',
+  '/services',
+  '/network',
+  '/contact',
+  '/list-your-property',
+  '/blog',
+  '/agent',
+];
 
 function isPublicPath(pathname: string): boolean {
   if (pathname === '/') return true;

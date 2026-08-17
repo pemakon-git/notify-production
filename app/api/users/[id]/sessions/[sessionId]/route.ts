@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 /** ถอนอุปกรณ์ทีละเครื่อง (spec 6: DELETE /users/:id/sessions/:sessionId) */
 export const DELETE = withPermission<{ id: string; sessionId: string }>(
-  'users',
+  'user',
   'update',
   async (_request, { auth, params }) => {
     const session = await prisma.userSession.findFirst({

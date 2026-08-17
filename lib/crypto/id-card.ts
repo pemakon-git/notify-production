@@ -24,12 +24,12 @@ function getKey(): Buffer {
   return key;
 }
 
-export interface EncryptedNationalId {
-  nationalIdEncrypted: string;
-  nationalIdLast4: string;
+export interface EncryptedIdCard {
+  idCardNo: string;
+  idCardLast4: string;
 }
 
-export function encryptNationalId(plaintext: string): EncryptedNationalId {
+export function encryptIdCard(plaintext: string): EncryptedIdCard {
   const normalized = plaintext.replace(/\D/g, '');
 
   if (normalized.length !== 13) {
@@ -42,12 +42,12 @@ export function encryptNationalId(plaintext: string): EncryptedNationalId {
   const payload = Buffer.concat([iv, cipher.getAuthTag(), ciphertext]);
 
   return {
-    nationalIdEncrypted: `${VERSION}:${payload.toString('base64')}`,
-    nationalIdLast4: normalized.slice(-4),
+    idCardNo: `${VERSION}:${payload.toString('base64')}`,
+    idCardLast4: normalized.slice(-4),
   };
 }
 
-export function decryptNationalId(stored: string): string {
+export function decryptIdCard(stored: string): string {
   const [version, encoded] = stored.split(':', 2);
 
   if (version !== VERSION || !encoded) {

@@ -13,46 +13,46 @@ describe('ตารางสิทธิ์ (spec 3.1–3.2)', () => {
   it('default deny — action ที่ไม่ได้ระบุในตาราง ทุก role ทำไม่ได้', () => {
     for (const role of ROLES) {
       expect(can(role, 'dashboard', 'delete')).toBe(false);
-      expect(can(role, 'leads', 'sign')).toBe(false);
-      expect(can(role, 'notifications', 'delete')).toBe(false);
+      expect(can(role, 'lead', 'sign')).toBe(false);
+      expect(can(role, 'notification', 'delete')).toBe(false);
     }
   });
 
   it('เฉพาะ super_admin เท่านั้นที่ อนุมัติ/เซ็น/ออกใบเสร็จ/ลบ ได้ (rule #5)', () => {
-    expect(can('super_admin', 'properties', 'approve')).toBe(true);
-    expect(can('super_admin', 'contracts', 'sign')).toBe(true);
-    expect(can('super_admin', 'contracts', 'issueReceipt')).toBe(true);
+    expect(can('super_admin', 'property', 'approve')).toBe(true);
+    expect(can('super_admin', 'contract', 'sign')).toBe(true);
+    expect(can('super_admin', 'contract', 'issue_receipt')).toBe(true);
 
     for (const role of ['property_manager', 'sales_agent'] as Role[]) {
-      expect(can(role, 'properties', 'approve')).toBe(false);
-      expect(can(role, 'contracts', 'sign')).toBe(false);
-      expect(can(role, 'contracts', 'issueReceipt')).toBe(false);
-      expect(can(role, 'properties', 'delete')).toBe(false);
-      expect(can(role, 'owners', 'delete')).toBe(false);
-      expect(can(role, 'customers', 'delete')).toBe(false);
+      expect(can(role, 'property', 'approve')).toBe(false);
+      expect(can(role, 'contract', 'sign')).toBe(false);
+      expect(can(role, 'contract', 'issue_receipt')).toBe(false);
+      expect(can(role, 'property', 'delete')).toBe(false);
+      expect(can(role, 'owner', 'delete')).toBe(false);
+      expect(can(role, 'customer', 'delete')).toBe(false);
     }
   });
 
   it('sales_agent: ทรัพย์และเจ้าของทรัพย์ = ดูอย่างเดียว', () => {
-    expect(can('sales_agent', 'properties', 'read')).toBe(true);
-    expect(can('sales_agent', 'properties', 'create')).toBe(false);
-    expect(can('sales_agent', 'properties', 'update')).toBe(false);
+    expect(can('sales_agent', 'property', 'read')).toBe(true);
+    expect(can('sales_agent', 'property', 'create')).toBe(false);
+    expect(can('sales_agent', 'property', 'update')).toBe(false);
 
-    expect(can('sales_agent', 'owners', 'read')).toBe(true);
-    expect(can('sales_agent', 'owners', 'create')).toBe(false);
-    expect(can('sales_agent', 'owners', 'update')).toBe(false);
+    expect(can('sales_agent', 'owner', 'read')).toBe(true);
+    expect(can('sales_agent', 'owner', 'create')).toBe(false);
+    expect(can('sales_agent', 'owner', 'update')).toBe(false);
   });
 
   it('sales_agent: สายขายทำได้เต็ม (lead / นัด / ลูกค้า / ร่างสัญญา)', () => {
-    for (const resource of ['leads', 'appointments', 'customers', 'contracts'] as const) {
+    for (const resource of ['lead', 'appointment', 'customer', 'contract'] as const) {
       expect(can('sales_agent', resource, 'create')).toBe(true);
       expect(can('sales_agent', resource, 'read')).toBe(true);
     }
-    expect(can('sales_agent', 'contracts', 'update')).toBe(false);
+    expect(can('sales_agent', 'contract', 'update')).toBe(false);
   });
 
   it('users / settings เข้าถึงได้เฉพาะ super_admin', () => {
-    for (const resource of ['users', 'settings'] as const) {
+    for (const resource of ['user', 'setting'] as const) {
       expect(can('super_admin', resource, 'read')).toBe(true);
       expect(can('property_manager', resource, 'read')).toBe(false);
       expect(can('sales_agent', resource, 'read')).toBe(false);
@@ -60,12 +60,12 @@ describe('ตารางสิทธิ์ (spec 3.1–3.2)', () => {
   });
 
   it('เลขบัตร ปชช. ต้องถูก mask สำหรับ property_manager และ sales_agent', () => {
-    expect(maskedFieldsFor('property_manager', 'owners')).toContain('nationalId');
-    expect(maskedFieldsFor('sales_agent', 'owners')).toContain('nationalId');
-    expect(maskedFieldsFor('super_admin', 'owners')).toEqual([]);
+    expect(maskedFieldsFor('property_manager', 'owner')).toContain('idCardNo');
+    expect(maskedFieldsFor('sales_agent', 'owner')).toContain('idCardNo');
+    expect(maskedFieldsFor('super_admin', 'owner')).toEqual([]);
 
-    expect(can('super_admin', 'owners', 'readSensitive')).toBe(true);
-    expect(can('property_manager', 'owners', 'readSensitive')).toBe(false);
+    expect(can('super_admin', 'owner', 'reveal_pii')).toBe(true);
+    expect(can('property_manager', 'owner', 'reveal_pii')).toBe(false);
   });
 
   it('ยิ่ง role สูง สิทธิ์ต้องไม่น้อยกว่า role ที่ต่ำกว่า (ไม่มีช่องโหว่ในตาราง)', () => {
@@ -78,7 +78,7 @@ describe('ตารางสิทธิ์ (spec 3.1–3.2)', () => {
     for (const [resource, actions] of Object.entries(permissions.sales_agent)) {
       // ข้อยกเว้นตามสเปค: sales_agent สร้าง/แก้ property_request ได้ในสายงานตัวเอง
       // แต่ทุก action อื่นต้องเป็น subset ของ role ที่สูงกว่า
-      if (resource === 'property_requests') continue;
+      if (resource === 'property_request') continue;
       for (const action of actions ?? []) {
         expect(
           permissions.property_manager[resource as keyof typeof permissions.property_manager],

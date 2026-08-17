@@ -7,13 +7,13 @@ import { forbidden, unauthorized } from '@/lib/http/errors';
 export interface AuthUser {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  fullName: string;
   phone: string | null;
   role: Role;
-  teamId: string | null;
   status: UserStatus;
   language: Language;
+  teamId: string | null;
+  branchId: string | null;
   createdAt: Date;
 }
 
@@ -75,13 +75,13 @@ export async function authenticate(request: Request): Promise<AuthContext> {
     select: {
       id: true,
       email: true,
-      firstName: true,
-      lastName: true,
+      fullName: true,
       phone: true,
       role: true,
-      teamId: true,
       status: true,
       language: true,
+      teamId: true,
+      branchId: true,
       createdAt: true,
     },
   });
@@ -114,13 +114,13 @@ export async function getServerSession(): Promise<AuthUser | null> {
     select: {
       id: true,
       email: true,
-      firstName: true,
-      lastName: true,
+      fullName: true,
       phone: true,
       role: true,
-      teamId: true,
       status: true,
       language: true,
+      teamId: true,
+      branchId: true,
       createdAt: true,
     },
   });

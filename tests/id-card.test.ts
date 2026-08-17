@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { nationalIdSchema } from '@/lib/types';
-import { decryptNationalId, encryptNationalId, safeCompare } from '@/lib/crypto/national-id';
+import { idCardSchema } from '@/lib/types';
+import { decryptIdCard, encryptIdCard, safeCompare } from '@/lib/crypto/id-card';
 
 beforeAll(() => {
   process.env.NATIONAL_ID_ENC_KEY = randomBytes(32).toString('base64');
@@ -14,16 +14,16 @@ beforeAll(() => {
 
 describe('เข้ารหัสเลขบัตรประชาชน (spec section 9)', () => {
   it('encrypt แล้ว decrypt กลับได้ค่าเดิม', () => {
-    const { nationalIdEncrypted, nationalIdLast4 } = encryptNationalId('1234567890123');
+    const { idCardNo, idCardLast4 } = encryptIdCard('1234567890123');
 
-    expect(nationalIdLast4).toBe('0123');
-    expect(nationalIdEncrypted.startsWith('v1:')).toBe(true);
-    expect(decryptNationalId(nationalIdEncrypted)).toBe('1234567890123');
+    expect(idCardLast4).toBe('0123');
+    expect(idCardNo.startsWith('v1:')).toBe(true);
+    expect(decryptIdCard(idCardNo)).toBe('1234567890123');
   });
 
   it('ciphertext ต้องไม่ซ้ำกันแม้ plaintext เดียวกัน (IV สุ่มทุกครั้ง)', () => {
-    const a = encryptNationalId('1234567890123').nationalIdEncrypted;
-    const b = encryptNationalId('1234567890123').nationalIdEncrypted;
+    const a = encryptIdCard('1234567890123').idCardNo;
+    const b = encryptIdCard('1234567890123').idCardNo;
 
     expect(a).not.toBe(b);
     // และห้ามมีเลขจริงโผล่ใน ciphertext
@@ -31,23 +31,23 @@ describe('เข้ารหัสเลขบัตรประชาชน (sp
   });
 
   it('ciphertext ที่ถูกแก้ไข → decrypt ไม่ผ่าน (GCM auth tag ทำงาน)', () => {
-    const { nationalIdEncrypted } = encryptNationalId('1234567890123');
-    const payload = Buffer.from(nationalIdEncrypted.slice(3), 'base64');
+    const { idCardNo } = encryptIdCard('1234567890123');
+    const payload = Buffer.from(idCardNo.slice(3), 'base64');
     const lastIndex = payload.length - 1;
     payload[lastIndex] = (payload[lastIndex] ?? 0) ^ 0xff;
 
-    expect(() => decryptNationalId(`v1:${payload.toString('base64')}`)).toThrow();
+    expect(() => decryptIdCard(`v1:${payload.toString('base64')}`)).toThrow();
   });
 
   it('ปฏิเสธเลขที่ไม่ครบ 13 หลัก', () => {
-    expect(() => encryptNationalId('12345')).toThrow(/13 หลัก/);
+    expect(() => encryptIdCard('12345')).toThrow(/13 หลัก/);
   });
 
   it('validate checksum เลขบัตรได้', () => {
     // 1101700207030 เป็นเลขที่ checksum ถูกต้อง
-    expect(nationalIdSchema.safeParse('1101700207030').success).toBe(true);
-    expect(nationalIdSchema.safeParse('1101700207031').success).toBe(false);
-    expect(nationalIdSchema.safeParse('abc').success).toBe(false);
+    expect(idCardSchema.safeParse('1101700207030').success).toBe(true);
+    expect(idCardSchema.safeParse('1101700207031').success).toBe(false);
+    expect(idCardSchema.safeParse('abc').success).toBe(false);
   });
 
   it('safeCompare เทียบค่าถูกต้อง', () => {

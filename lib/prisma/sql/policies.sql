@@ -71,14 +71,14 @@ END $$;
 -- ─────────────────────────────────────────────────────────────
 ALTER TABLE public.appointments DROP CONSTRAINT IF EXISTS appointments_duration_positive;
 ALTER TABLE public.appointments
-  ADD CONSTRAINT appointments_duration_positive CHECK (duration_minutes > 0);
+  ADD CONSTRAINT appointments_duration_positive CHECK (duration_min > 0);
 
 -- ends_at เขียนจาก app layer — CHECK นี้กันไม่ให้เขียนค่าที่ไม่สอดคล้องกับ duration
 -- (make_interval เป็น immutable จึงใช้ใน CHECK ได้)
 ALTER TABLE public.appointments DROP CONSTRAINT IF EXISTS appointments_ends_at_consistent;
 ALTER TABLE public.appointments
   ADD CONSTRAINT appointments_ends_at_consistent
-  CHECK (ends_at = scheduled_at + make_interval(mins => duration_minutes));
+  CHECK (ends_at = scheduled_at + make_interval(mins => duration_min));
 
 -- agent เดียวกัน + ช่วงเวลาซ้อนกัน = insert ไม่ผ่าน (ยกเว้นนัดที่ถูกยกเลิก)
 -- '[)' = ติดกันพอดีไม่ถือว่าชน (10:00-11:00 กับ 11:00-12:00 ผ่าน)
@@ -187,9 +187,9 @@ CREATE INDEX IF NOT EXISTS properties_title_th_trgm
 CREATE INDEX IF NOT EXISTS properties_project_name_trgm
   ON public.properties USING gin (project_name gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS owners_name_trgm
-  ON public.owners USING gin ((first_name || ' ' || last_name) gin_trgm_ops);
+  ON public.owners USING gin (full_name gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS leads_name_trgm
-  ON public.leads USING gin (name gin_trgm_ops);
+  ON public.leads USING gin (full_name gin_trgm_ops);
 
 -- ─────────────────────────────────────────────────────────────
 -- 7. RLS — เปิดทุกตารางเป็น default deny
@@ -216,9 +216,8 @@ REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon, authenticated;
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT SELECT ON public.properties         TO anon, authenticated;
-GRANT SELECT ON public.property_images    TO anon, authenticated;
-GRANT SELECT ON public.amenities          TO anon, authenticated;
-GRANT SELECT ON public.property_amenities TO anon, authenticated;
+GRANT SELECT ON public.property_media    TO anon, authenticated;
+GRANT SELECT ON public.master_data       TO anon, authenticated;
 
 -- web-public อ่านได้เฉพาะทรัพย์ที่เผยแพร่แล้ว
 DROP POLICY IF EXISTS properties_public_read ON public.properties;
@@ -226,31 +225,22 @@ CREATE POLICY properties_public_read ON public.properties
   FOR SELECT TO anon, authenticated
   USING (status = 'available'::public.property_status);
 
-DROP POLICY IF EXISTS property_images_public_read ON public.property_images;
-CREATE POLICY property_images_public_read ON public.property_images
+DROP POLICY IF EXISTS property_media_public_read ON public.property_media;
+CREATE POLICY property_media_public_read ON public.property_media
   FOR SELECT TO anon, authenticated
   USING (
     EXISTS (
       SELECT 1 FROM public.properties p
-      WHERE p.id = property_images.property_id
+      WHERE p.id = property_media.property_id
         AND p.status = 'available'::public.property_status
     )
   );
 
-DROP POLICY IF EXISTS amenities_public_read ON public.amenities;
-CREATE POLICY amenities_public_read ON public.amenities
-  FOR SELECT TO anon, authenticated USING (true);
+DROP POLICY IF EXISTS master_data_public_read ON public.master_data;
+CREATE POLICY master_data_public_read ON public.master_data
+  FOR SELECT TO anon, authenticated USING (is_active);
 
-DROP POLICY IF EXISTS property_amenities_public_read ON public.property_amenities;
-CREATE POLICY property_amenities_public_read ON public.property_amenities
-  FOR SELECT TO anon, authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.properties p
-      WHERE p.id = property_amenities.property_id
-        AND p.status = 'available'::public.property_status
-    )
-  );
+
 
 -- ─────────────────────────────────────────────────────────────
 -- 8. Supabase Storage — แยก bucket public / private ตาม spec section 9
@@ -277,8 +267,8 @@ BEGIN
         allowed_mime_types = EXCLUDED.allowed_mime_types;
 
   -- รูปทรัพย์: อ่านได้สาธารณะ / เขียนได้เฉพาะ service_role (ผ่าน api)
-  DROP POLICY IF EXISTS property_images_read ON storage.objects;
-  CREATE POLICY property_images_read ON storage.objects
+  DROP POLICY IF EXISTS property_media_read ON storage.objects;
+  CREATE POLICY property_media_read ON storage.objects
     FOR SELECT TO anon, authenticated
     USING (bucket_id = 'property-images');
 

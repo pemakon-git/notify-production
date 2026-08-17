@@ -1,11 +1,10 @@
 /**
- * Seed สำหรับ dev/staging (spec section 10)
+ * Seed สำหรับ dev/staging
  *
- * สร้าง user ครบ 3 role + amenity master + เจ้าของทรัพย์และทรัพย์ตัวอย่าง
- * เพื่อทดสอบ RBAC ได้ตั้งแต่ milestone 1 โดยไม่ต้องกรอกข้อมูลเอง
+ * สร้าง user ครบ 3 บทบาท + master data (จังหวัด/สิ่งอำนวยความสะดวก) + เจ้าของทรัพย์
+ * และทรัพย์ตัวอย่าง เพื่อทดสอบ RBAC ได้ทันทีโดยไม่ต้องกรอกเอง
  *
- * ปลอดภัยกับข้อมูลที่มีอยู่: ใช้ upsert ทั้งหมด รันซ้ำได้ ไม่ลบของเดิม
- * และจะไม่รันบน production (เช็ค NODE_ENV / ต้องส่ง --force)
+ * ปลอดภัยกับข้อมูลเดิม: upsert ทั้งหมด รันซ้ำได้ · ไม่รันบน production (ต้องส่ง --force)
  */
 import { join } from 'node:path';
 import { PrismaClient, type Role } from '@prisma/client';
@@ -37,59 +36,49 @@ if (missing.length > 0) {
 }
 
 const prisma = new PrismaClient();
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { autoRefreshToken: false, persistSession: false } },
+);
 
 const SEED_PASSWORD = process.env.SEED_PASSWORD ?? 'DevPassword!2026';
 
-const SEED_USERS: Array<{
-  email: string;
-  firstName: string;
-  lastName: string;
-  phone: string;
-  role: Role;
-}> = [
-  {
-    email: 'owner@example.com',
-    firstName: 'เจ้าของ',
-    lastName: 'ระบบ',
-    phone: '0810000001',
-    role: 'super_admin',
-  },
+const BRANCH_ID = '00000000-0000-4000-8000-000000000001';
+const OWNER_ID = '00000000-0000-4000-8000-000000000101';
+
+const SEED_USERS: Array<{ email: string; fullName: string; phone: string; role: Role }> = [
+  { email: 'owner@example.com', fullName: 'เจ้าของ ระบบ', phone: '0810000001', role: 'super_admin' },
   {
     email: 'manager@example.com',
-    firstName: 'ผู้จัดการ',
-    lastName: 'ทรัพย์สิน',
+    fullName: 'ผู้จัดการ ทรัพย์สิน',
     phone: '0810000002',
     role: 'property_manager',
   },
-  {
-    email: 'sales@example.com',
-    firstName: 'เซล',
-    lastName: 'ขายเก่ง',
-    phone: '0810000003',
-    role: 'sales_agent',
-  },
+  { email: 'sales@example.com', fullName: 'เซล ขายเก่ง', phone: '0810000003', role: 'sales_agent' },
 ];
 
-const AMENITIES: Array<{
-  slug: string;
-  nameTh: string;
-  nameEn: string;
-  category: 'common' | 'security' | 'transport' | 'pet' | 'other';
-}> = [
-  { slug: 'pool', nameTh: 'สระว่ายน้ำ', nameEn: 'Swimming pool', category: 'common' },
-  { slug: 'fitness', nameTh: 'ฟิตเนส', nameEn: 'Fitness', category: 'common' },
-  { slug: 'co-working', nameTh: 'Co-working space', nameEn: 'Co-working space', category: 'common' },
-  { slug: 'cctv', nameTh: 'กล้องวงจรปิด', nameEn: 'CCTV', category: 'security' },
-  { slug: 'keycard', nameTh: 'คีย์การ์ด', nameEn: 'Key card access', category: 'security' },
-  { slug: 'guard-24h', nameTh: 'รักษาความปลอดภัย 24 ชม.', nameEn: '24h security', category: 'security' },
-  { slug: 'near-bts', nameTh: 'ใกล้ BTS', nameEn: 'Near BTS', category: 'transport' },
-  { slug: 'near-mrt', nameTh: 'ใกล้ MRT', nameEn: 'Near MRT', category: 'transport' },
-  { slug: 'parking', nameTh: 'ที่จอดรถ', nameEn: 'Parking', category: 'transport' },
-  { slug: 'pet-friendly', nameTh: 'เลี้ยงสัตว์ได้', nameEn: 'Pet friendly', category: 'pet' },
-  { slug: 'garden', nameTh: 'สวนส่วนกลาง', nameEn: 'Garden', category: 'other' },
+/** master data — มี label 2 ภาษาในตัว (UI เลือกตาม locale ไม่ต้องแปลที่ catalog) */
+const PROVINCES = [
+  { code: 'bangkok', labelTh: 'กรุงเทพมหานคร', labelEn: 'Bangkok' },
+  { code: 'nonthaburi', labelTh: 'นนทบุรี', labelEn: 'Nonthaburi' },
+  { code: 'samut_prakan', labelTh: 'สมุทรปราการ', labelEn: 'Samut Prakan' },
+  { code: 'chonburi', labelTh: 'ชลบุรี', labelEn: 'Chonburi' },
+  { code: 'chiang_mai', labelTh: 'เชียงใหม่', labelEn: 'Chiang Mai' },
+];
+
+const AMENITIES = [
+  { code: 'pool', labelTh: 'สระว่ายน้ำ', labelEn: 'Swimming pool', group: 'common' },
+  { code: 'fitness', labelTh: 'ฟิตเนส', labelEn: 'Fitness', group: 'common' },
+  { code: 'co_working', labelTh: 'Co-working space', labelEn: 'Co-working space', group: 'common' },
+  { code: 'garden', labelTh: 'สวนส่วนกลาง', labelEn: 'Garden', group: 'common' },
+  { code: 'cctv', labelTh: 'กล้องวงจรปิด', labelEn: 'CCTV', group: 'security' },
+  { code: 'keycard', labelTh: 'คีย์การ์ด', labelEn: 'Key card access', group: 'security' },
+  { code: 'guard_24h', labelTh: 'รปภ. 24 ชม.', labelEn: '24h security', group: 'security' },
+  { code: 'near_bts', labelTh: 'ใกล้ BTS', labelEn: 'Near BTS', group: 'transport' },
+  { code: 'near_mrt', labelTh: 'ใกล้ MRT', labelEn: 'Near MRT', group: 'transport' },
+  { code: 'parking', labelTh: 'ที่จอดรถ', labelEn: 'Parking', group: 'transport' },
+  { code: 'pet_friendly', labelTh: 'เลี้ยงสัตว์ได้', labelEn: 'Pet friendly', group: 'pet' },
 ];
 
 async function ensureAuthUser(email: string): Promise<string> {
@@ -108,7 +97,6 @@ async function ensureAuthUser(email: string): Promise<string> {
     throw new Error(`สร้าง auth user ${email} ไม่สำเร็จ: ${created.error?.message}`);
   }
 
-  // มีอยู่แล้ว — หา id เพื่อ upsert profile ให้ตรงกัน
   const { data, error } = await supabase.auth.admin.listUsers({ page: 1, perPage: 200 });
   if (error) throw new Error(`listUsers ล้มเหลว: ${error.message}`);
 
@@ -119,55 +107,59 @@ async function ensureAuthUser(email: string): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  console.log('▸ seed amenities');
-  for (const amenity of AMENITIES) {
-    await prisma.amenity.upsert({
-      where: { slug: amenity.slug },
-      create: amenity,
-      update: { nameTh: amenity.nameTh, nameEn: amenity.nameEn, category: amenity.category },
+  console.log('▸ master data (จังหวัด + สิ่งอำนวยความสะดวก)');
+  for (const [index, province] of PROVINCES.entries()) {
+    await prisma.masterData.upsert({
+      where: { kind_code: { kind: 'province', code: province.code } },
+      create: { kind: 'province', ...province, sortOrder: index },
+      update: { labelTh: province.labelTh, labelEn: province.labelEn, sortOrder: index },
+    });
+  }
+  for (const [index, amenity] of AMENITIES.entries()) {
+    await prisma.masterData.upsert({
+      where: { kind_code: { kind: 'amenity', code: amenity.code } },
+      create: { kind: 'amenity', ...amenity, sortOrder: index },
+      update: { labelTh: amenity.labelTh, labelEn: amenity.labelEn, group: amenity.group },
     });
   }
 
-  console.log('▸ seed team');
-  const team = await prisma.team.upsert({
-    where: { id: '00000000-0000-4000-8000-000000000001' },
-    create: { id: '00000000-0000-4000-8000-000000000001', name: 'ทีมกรุงเทพ' },
+  console.log('▸ สาขา');
+  const branch = await prisma.branch.upsert({
+    where: { id: BRANCH_ID },
+    create: { id: BRANCH_ID, name: 'สำนักงานใหญ่' },
     update: {},
   });
 
-  console.log('▸ seed users (3 roles)');
-  const profiles: Record<Role, string> = {} as Record<Role, string>;
+  console.log('▸ ผู้ใช้ 3 บทบาท');
+  const profiles: Partial<Record<Role, string>> = {};
 
   for (const user of SEED_USERS) {
     const id = await ensureAuthUser(user.email);
 
     await prisma.profile.upsert({
       where: { id },
-      create: { id, ...user, teamId: team.id, language: 'th' },
-      update: { ...user, teamId: team.id },
+      create: { id, ...user, branchId: branch.id, language: 'en' },
+      update: { ...user, branchId: branch.id },
     });
 
     profiles[user.role] = id;
     console.log(`  ✓ ${user.role.padEnd(17)} ${user.email}`);
   }
 
-  console.log('▸ seed owner + properties');
+  console.log('▸ เจ้าของทรัพย์ + ทรัพย์ตัวอย่าง');
   const owner = await prisma.owner.upsert({
-    where: { id: '00000000-0000-4000-8000-000000000101' },
+    where: { id: OWNER_ID },
     create: {
-      id: '00000000-0000-4000-8000-000000000101',
-      firstName: 'สมชาย',
-      lastName: 'เจ้าของห้อง',
+      id: OWNER_ID,
+      fullName: 'สมชาย เจ้าของห้อง',
       phone: '0899999999',
       email: 'somchai@example.com',
       address: '123 ถนนสุขุมวิท กรุงเทพฯ',
+      branchId: branch.id,
       // ตั้งใจไม่ seed เลขบัตรจริง — ให้ทดสอบผ่าน endpoint ที่เข้ารหัสเองเท่านั้น
     },
     update: {},
   });
-
-  const poolAmenity = await prisma.amenity.findUniqueOrThrow({ where: { slug: 'pool' } });
-  const btsAmenity = await prisma.amenity.findUniqueOrThrow({ where: { slug: 'near-bts' } });
 
   const properties = [
     {
@@ -176,7 +168,8 @@ async function main(): Promise<void> {
       status: 'available' as const,
       titleTh: 'คอนโดใกล้ BTS อโศก 1 ห้องนอน',
       titleEn: 'Condo near BTS Asok, 1 bedroom',
-      rentPrice: 25000,
+      monthlyRent: 25000,
+      publishedAt: new Date(),
     },
     {
       id: '00000000-0000-4000-8000-000000000202',
@@ -184,7 +177,8 @@ async function main(): Promise<void> {
       status: 'draft' as const,
       titleTh: 'คอนโด (ร่าง — ยังไม่เผยแพร่)',
       titleEn: 'Condo (draft, not published)',
-      rentPrice: 18000,
+      monthlyRent: 18000,
+      publishedAt: null,
     },
   ];
 
@@ -193,28 +187,27 @@ async function main(): Promise<void> {
       where: { id: property.id },
       create: {
         ...property,
-        type: 'condo',
+        propertyType: 'condo',
         ownerId: owner.id,
+        branchId: branch.id,
         province: 'กรุงเทพมหานคร',
         district: 'วัฒนา',
-        subDistrict: 'คลองเตยเหนือ',
+        subdistrict: 'คลองเตยเหนือ',
         depositMonths: 2,
         bedrooms: 1,
         bathrooms: 1,
         areaSqm: 35,
-        floor: 12,
-        furnishing: 'fully_furnished',
-        managedById: profiles.property_manager,
-        sourcedById: profiles.sales_agent,
-        amenities: {
-          create: [{ amenityId: poolAmenity.id }, { amenityId: btsAmenity.id }],
-        },
+        floor: '12',
+        furnished: 'fully',
+        amenities: ['pool', 'near_bts', 'cctv'],
+        assignedToId: profiles.property_manager ?? null,
+        sourcedById: profiles.sales_agent ?? null,
       },
       update: { status: property.status },
     });
   }
 
-  // reset running number ให้ตรงกับ code ที่ seed ไป ไม่ให้ออกเลขซ้ำของจริง
+  // ตั้ง running number ให้ตรงกับ code ที่ seed ไป ไม่ให้ออกเลขซ้ำของจริง
   await prisma.codeSequence.upsert({
     where: { scope_year: { scope: 'CD', year: 2026 } },
     create: { scope: 'CD', year: 2026, lastValue: properties.length },
@@ -223,7 +216,7 @@ async function main(): Promise<void> {
 
   console.log('\n✓ seed เสร็จแล้ว');
   console.log(`  รหัสผ่านทุกบัญชี: ${SEED_PASSWORD}`);
-  console.log('  ทรัพย์ available 1 รายการ / draft 1 รายการ (ใช้ทดสอบ RLS ของ web-public)');
+  console.log('  ทรัพย์ available 1 รายการ / draft 1 รายการ (ใช้ทดสอบ RLS ของหน้าลูกค้า)');
 }
 
 main()
