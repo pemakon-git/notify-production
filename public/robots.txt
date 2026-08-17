@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+# spec section 9 — SEO isolation: ห้าม index ฝั่งพนักงานและ API
+Disallow: /admin
+Disallow: /api
+Disallow: /login

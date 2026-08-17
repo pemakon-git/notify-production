@@ -1,0 +1,22 @@
+node_modules/
+.next/
+out/
+dist/
+coverage/
+.turbo/
+
+# env — ห้าม commit ทุกกรณี (SUPABASE_SERVICE_ROLE_KEY / NATIONAL_ID_ENC_KEY อยู่ในนี้)
+.env
+.env.*
+!.env.example
+
+# supabase local
+supabase/.branches/
+supabase/.temp/
+
+# editor / os
+.DS_Store
+Thumbs.db
+*.log
+.vercel
+*.tsbuildinfo

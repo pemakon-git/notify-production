@@ -7,56 +7,57 @@
 
 ## 1. ภาพรวมระบบ
 
-ระบบจัดการเช่าอสังหาริมทรัพย์ (property rental management) ประกอบด้วย 3 ส่วน:
+ระบบจัดการเช่าอสังหาริมทรัพย์ (property rental management) เป็น **Next.js app เดียว** (1 codebase, deploy 1 Vercel project) แบ่งเป็น 3 ชั้นภายในแอปเดียวกัน:
 
-| ส่วน | เทคโนโลยี | ผู้ใช้ | หน้าที่ |
+| ชั้น | อยู่ที่ | ผู้ใช้ | หน้าที่ |
 |---|---|---|---|
-| `web-admin` | Next.js (deploy บน Vercel) | พนักงาน (login) | operation ทั้งหมด: ทรัพย์, ลูกค้า, สัญญา, เอกสาร |
-| `web-public` | Next.js (deploy บน Vercel) | ลูกค้า (ไม่ login) | ดูประกาศทรัพย์, ฟอร์มนัดดู |
-| `api` | Next.js Route Handlers เท่านั้น ไม่มี UI (deploy บน Vercel แยกโปรเจกต์) | ทั้งสองฝั่งเรียกผ่าน REST | business logic, RBAC, audit ทั้งหมด — รันเป็น Node.js runtime แบบ serverless |
+| Public routes | `app/(public)/*` — ไม่ต้อง login | ลูกค้า | ดูประกาศทรัพย์, ฟอร์มนัดดู |
+| Admin routes (Protected route) | `app/(admin)/*` — ผ่าน middleware บังคับ login + role | พนักงาน | operation ทั้งหมด: ทรัพย์, ลูกค้า, สัญญา, เอกสาร |
+| API (Route Handlers) | `app/api/*` — Node.js runtime, serverless | ทั้งสองฝั่งเรียกผ่าน REST | business logic, RBAC, audit ทั้งหมด |
 | Supabase | Postgres + Row Level Security + Auth + Storage | — | เก็บข้อมูล, auth session, ไฟล์เอกสาร/รูป |
 
-**หลักการสำคัญ:** `web-admin` และ `web-public` **ห้ามมี business logic** — มีหน้าที่แสดงผลและเรียก API เท่านั้น การตรวจสิทธิ์/กติกาทั้งหมดต้องอยู่ที่ `api` เสมอ (ห้ามเชื่อ input จาก client) **ยกเว้น** การอ่านข้อมูล public ล้วนๆ (เช่น listing ทรัพย์ที่เผยแพร่แล้วใน `web-public`) ที่อนุญาตให้เรียก Supabase ตรงผ่าน `supabase-js` ได้ โดยมี RLS เป็นตัวบังคับสิทธิ์แทน
+**หลักการสำคัญ:** ทั้ง public routes และ admin routes (UI layer) **ห้ามมี business logic** — มีหน้าที่แสดงผลและเรียก `app/api/*` เท่านั้น การตรวจสิทธิ์/กติกาทั้งหมดต้องอยู่ที่ API layer เสมอ (ห้ามเชื่อ input จาก client) **ยกเว้น** การอ่านข้อมูล public ล้วนๆ (เช่น listing ทรัพย์ที่เผยแพร่แล้ว) ที่อนุญาตให้เรียก Supabase ตรงผ่าน `supabase-js` ได้ โดยมี RLS เป็นตัวบังคับสิทธิ์แทน
 
-> **หมายเหตุ:** `api` ยังคงเป็น **Node.js** เหมือนเดิม (Next.js Route Handlers รันบน Node.js runtime) เพียงแต่ deploy แบบ serverless function บน Vercel แทนที่จะเป็น long-running server เหตุผลและรายละเอียดดูหัวข้อ 2.1
+> **หมายเหตุ:** แม้จะรวมเป็น app เดียว แต่ **การแยกด่านตรวจสิทธิ์ยังต้องเข้มเหมือนเดิมทุกจุด** — เพราะ origin เดียวกันแปลว่าโอกาสหลุด (เช่น middleware พลาด, forget guard ใน endpoint ใหม่) ส่งผลกระทบกว้างกว่าตอนแยก 2 app เหตุผลและวิธีลดความเสี่ยงดูหัวข้อ 2.1
 
 ---
 
 ## 2. Tech Stack
 
 ```
-Backend (api):
-  - Next.js 14+ Route Handlers เท่านั้น (ไม่มีหน้า UI) — Node.js runtime, deploy บน Vercel
-  - Supabase Postgres 15+
+Next.js app เดียว (1 Vercel project):
+  - Next.js 14+ (App Router), TypeScript
+  - Route Handlers (app/api/*) — Node.js runtime, business logic/RBAC/audit ทั้งหมด
+  - Middleware (middleware.ts) — ด่านแรกกันเข้าถึง (admin)/* ถ้าไม่ login/ไม่มี role พอ
+  - TanStack Query (data fetching / cache ฝั่ง UI)
+  - supabase-js (เฉพาะ read-only public data เช่น listing ทรัพย์)
+  - Zod (validate form ฝั่ง client — เป็น UX เสริม ไม่ใช่ security)
+
+Data & infra:
+  - Supabase Postgres 15+ พร้อม Row Level Security
   - Prisma ORM (ต่อผ่าน Supabase connection pooler — ดู 2.1)
   - Supabase Auth (JWT + session) แทนการเขียน auth เอง
   - Postgres exclusion constraint (btree_gist) แทน Redis lock สำหรับกันนัดชนกัน
   - Vercel Cron Jobs / Supabase pg_cron สำหรับงาน schedule (เช็คสัญญาใกล้หมด, ส่ง notification)
   - Supabase Storage สำหรับไฟล์เอกสาร/รูป
 
-Frontend (ทั้ง web-admin และ web-public):
-  - Next.js 14+ (App Router), deploy บน Vercel
-  - TypeScript
-  - TanStack Query (data fetching / cache)
-  - supabase-js (เฉพาะ read-only public data เช่น listing ทรัพย์ใน web-public)
-  - Zod (validate form ฝั่ง client — เป็น UX เสริม ไม่ใช่ security)
-
 Infra:
-  - 3 Vercel projects แยกกัน: web-admin, web-public, api
+  - Vercel project เดียว: 1 repo, 1 deploy pipeline
   - Supabase project เดียว: Postgres + Auth + Storage + RLS
 ```
 
-### 2.1 ทำไม `api` ไม่ต้องแยกเป็น Node.js server ต่างหาก
+### 2.1 สถาปัตยกรรม single-app: ข้อควรระวังและวิธีลดความเสี่ยง
 
-เพราะ Next.js Route Handlers **คือ Node.js runtime** อยู่แล้ว (ไม่ใช่ runtime อื่น) การใช้มันเป็น backend กลางจึงยังตอบโจทย์ "logic อยู่ที่ Node.js" เหมือนเดิม เพียงแต่:
+เดิม spec แยก `web-admin` / `web-public` / `api` เป็น 3 โปรเจกต์ เพื่อตัด attack surface และแยก deploy อิสระกัน แต่ตอนนี้รวมเป็น Next.js app เดียวโดยใช้ **protected route ที่มีอยู่แล้ว** เป็นด่านกั้นฝั่ง admin การรวมยังใช้ได้ดี ถ้าคุมจุดต่อไปนี้ให้เข้ม:
 
-- **ข้อดี:** deploy ง่าย (push ขึ้น Vercel เหมือน frontend), scale อัตโนมัติตาม request, ไม่ต้องดูแล server/infra เพิ่ม, cost ตาม usage จริง
-- **ข้อจำกัดที่ต้องออกแบบเลี่ยง:** serverless function มี timeout และไม่ persist state ระหว่าง request ดังนั้น
-  - ห้ามใช้ in-memory lock/cache ข้าม request (แก้ด้วย Postgres constraint แทน Redis)
-  - ห้ามมี long-running worker ในตัว `api` เอง (แก้ด้วย Vercel Cron / Supabase pg_cron ยิงเข้ามาเป็น request สั้นๆ แทน)
-  - ทุก request ต้องเปิด/ปิด DB connection สั้นๆ ผ่าน pooler (ดูหัวข้อ 9)
+| ความเสี่ยงจากการรวม app | วิธีลดความเสี่ยงในสถาปัตยกรรมนี้ |
+|---|---|
+| middleware พลาด/ลืมใส่ guard ใน route ใหม่ → หลุดเข้า admin ได้ | Route group `app/(admin)/*` ทุกตัวต้องผ่าน `middleware.ts` ที่เช็ค Supabase JWT + role แบบ default-deny (ไม่ใช่ whitelist เฉพาะบาง route) |
+| Route Handler เดียวถูกเรียกได้จากทั้ง public และ admin โดยไม่เช็คสิทธิ์ | ทุก Route Handler ยังต้องเรียก `requirePermission()` ของตัวเองเสมอ **ห้ามพึ่ง middleware อย่างเดียว** — มองว่า middleware คือด่านที่ 1 (UI-level), permission check ใน route handler คือด่านที่ 2 (data-level) |
+| Admin bundle (ตาราง/ฟอร์มจัดการ) หลุดไปอยู่ใน JS ที่ฝั่ง public โหลด | แยก route group ชัดเจน `app/(public)/*` กับ `app/(admin)/*` — Next.js code-split ตาม route อัตโนมัติอยู่แล้ว ตราบใดที่ไม่ import component ข้าม group กัน |
+| Search engine เก็บ index หน้า admin | ตั้ง `robots.txt` disallow `/admin` และใส่ `noindex` metadata ใน layout ของ route group `(admin)` |
 
-**เก็บ `api` เป็นโปรเจกต์แยกจาก `web-admin`/`web-public`** (ไม่ฝัง route handler ไว้ในแต่ละ frontend) เพื่อให้ยังมี business logic อยู่จุดเดียว ทั้งสอง frontend เรียกผ่าน HTTPS เหมือนเดิมตาม diagram ที่แนะนำไว้ก่อนหน้า
+**สรุป:** business logic ยังอยู่จุดเดียวที่ `app/api/*` เหมือนเดิม (ยังตอบโจทย์ "logic อยู่ที่ Node.js") เพียงแต่ตอนนี้ UI ทั้งสองฝั่งอยู่ repo/deploy เดียวกัน ไม่ได้ลดความเข้มงวดของ RBAC ที่วางไว้ในหัวข้อ 3 เลย — แค่ลดจำนวนโปรเจกต์ที่ต้องดูแล
 
 ---
 
@@ -241,7 +242,7 @@ approveProperty(...) { ... }
 
 ---
 
-## 6. API Structure (NestJS module ต่อ resource)
+## 6. API Structure (`app/api/*` Route Handler ต่อ resource)
 
 ```
 /auth
@@ -312,59 +313,88 @@ approveProperty(...) { ... }
   GET   /audit/logs        (super_admin เต็ม, property_manager จำกัด scope)
   GET   /audit/export
 
-/public   (สำหรับ web-public เท่านั้น ไม่ต้อง auth)
+/public   (สำหรับ route group (public) เรียก — ไม่ต้อง auth)
   GET   /public/properties
   GET   /public/properties/:id
   POST  /public/appointments    (= สร้าง lead + appointment พร้อมกัน)
 ```
 
+> เส้นทางทั้งหมดข้างบนอยู่ภายใต้ `app/api/` เดียวกัน ไม่ได้แยก deploy — route ที่ไม่ได้อยู่ใต้ `/public/*` ถือว่าต้อง auth เป็น default เสมอ (default-deny) และยังต้องเช็ค `requirePermission()` ตาม policy ในหัวข้อ 3.2 ทุก endpoint แม้ว่า middleware จะกันชั้นนอกไว้แล้วก็ตาม
+
 ---
 
-## 7. โครงสร้างโฟลเดอร์ที่แนะนำ
+## 7. โครงสร้างโฟลเดอร์ที่แนะนำ (Next.js app เดียว)
 
 ```
 repo/
-├── apps/
-│   ├── web-admin/          (Next.js — deploy Vercel project #1)
-│   ├── web-public/         (Next.js — deploy Vercel project #2)
-│   └── api/                (Next.js Route Handlers เท่านั้น — deploy Vercel project #3)
-│       └── src/
-│           └── app/api/
-│               ├── auth/
-│               ├── users/
-│               ├── properties/
-│               ├── property-requests/
-│               ├── owners/
-│               ├── leads/
-│               ├── appointments/
-│               ├── customers/
-│               ├── contracts/
-│               ├── documents/
-│               ├── notifications/
-│               ├── audit/
-│               ├── cron/               (endpoint ที่ Vercel Cron ยิงเข้ามา)
-│               └── public/             (endpoint สำหรับ web-public: leads/appointments)
-│           lib/
-│           ├── auth/               (helper ตรวจ Supabase JWT)
-│           ├── policies/           (permissions.config.ts)
-│           ├── guards/             (requirePermission(), maskFields())
-│           ├── audit/              (writeAuditLog helper)
-│           └── prisma/
-│               └── schema.prisma
-├── packages/
-│   └── shared-types/       (DTO/type ที่ frontend+backend ใช้ร่วมกัน)
+├── app/
+│   ├── (public)/                   ← route group: ลูกค้า ไม่ต้อง login
+│   │   ├── layout.tsx
+│   │   ├── page.tsx                 (หน้าแรก)
+│   │   ├── properties/
+│   │   │   ├── page.tsx             (listing)
+│   │   │   └── [id]/page.tsx        (รายละเอียดทรัพย์)
+│   │   └── book/page.tsx            (ฟอร์มนัดดู)
+│   │
+│   ├── (admin)/                     ← route group: พนักงาน ผ่าน protected route
+│   │   ├── layout.tsx               (เช็ค session ซ้ำอีกชั้น + เมนูตาม role)
+│   │   ├── admin/
+│   │   │   ├── dashboard/page.tsx
+│   │   │   ├── properties/...
+│   │   │   ├── property-requests/...
+│   │   │   ├── owners/...
+│   │   │   ├── leads/...
+│   │   │   ├── appointments/...
+│   │   │   ├── customers/...
+│   │   │   ├── contracts/...
+│   │   │   ├── documents/...
+│   │   │   ├── users/...            (super_admin เท่านั้น)
+│   │   │   └── audit/...
+│   │
+│   ├── api/                         ← Route Handlers, Node.js runtime
+│   │   ├── auth/
+│   │   ├── users/
+│   │   ├── properties/
+│   │   ├── property-requests/
+│   │   ├── owners/
+│   │   ├── leads/
+│   │   ├── appointments/
+│   │   ├── customers/
+│   │   ├── contracts/
+│   │   ├── documents/
+│   │   ├── notifications/
+│   │   ├── audit/
+│   │   ├── cron/                    (endpoint ที่ Vercel Cron ยิงเข้ามา)
+│   │   └── public/                  (endpoint แบบไม่ auth: leads/appointments จากฝั่ง public)
+│   │
+│   └── middleware.ts                ← guard ทุก request เข้า /admin/* (เช็ค Supabase JWT + role)
+│
+├── components/
+│   ├── public/                      (UI เฉพาะฝั่งลูกค้า)
+│   └── admin/                       (UI เฉพาะฝั่งพนักงาน — ไม่ import เข้าฝั่ง public)
+│
+├── lib/
+│   ├── auth/                        (helper ตรวจ Supabase JWT, getServerSession)
+│   ├── policies/                    (permissions.config.ts)
+│   ├── guards/                      (requirePermission(), maskFields())
+│   ├── audit/                       (writeAuditLog helper)
+│   └── prisma/
+│       └── schema.prisma
+│
 ├── supabase/
-│   ├── migrations/         (RLS policies, exclusion constraint, extensions)
+│   ├── migrations/                  (RLS policies, exclusion constraint, extensions)
 │   └── config.toml
-└── vercel.json  (x3 — ต่อ project)
+└── vercel.json                      (1 project เดียว)
 ```
+
+> ไม่ต้องมี `packages/shared-types` แยกแล้ว เพราะ type ระหว่าง UI กับ API อยู่ใน repo เดียวกัน import ตรงได้เลย
 
 ---
 
 ## 8. ลำดับการ implement ที่แนะนำ (milestone)
 
-1. **Foundation** — สร้าง Supabase project, ตั้ง connection pooler, Prisma schema เต็ม, migration (RLS + extensions), เชื่อม Supabase Auth เข้ากับ `profiles` table (role/team_id)
-2. **RBAC core** — permissions.config, requirePermission() helper, field masking helper, audit log helper (ทำก่อนโมดูลอื่น เพราะทุกโมดูลต้องใช้)
+1. **Foundation** — สร้าง Next.js project เดียว, สร้าง Supabase project, ตั้ง connection pooler, Prisma schema เต็ม, migration (RLS + extensions), เชื่อม Supabase Auth เข้ากับ `profiles` table (role/team_id), ตั้ง route group `(public)`/`(admin)` เปล่าๆ + `middleware.ts` เช็ค session เบื้องต้น
+2. **RBAC core** — permissions.config, requirePermission() helper, field masking helper, audit log helper (ทำก่อนโมดูลอื่น เพราะทุกโมดูลต้องใช้) รวมถึงทดสอบว่า middleware บล็อก `/admin/*` จริงสำหรับ role ที่ไม่ควรเข้าได้
 3. **Users + Dashboard** — จัดการผู้ใช้ + แดชบอร์ดตาม role
 4. **Properties + Property Requests** — รวม state machine (draft→pending→available) + amenities
 5. **Owners** — พร้อม field masking + encryption เลขบัตร
@@ -373,8 +403,9 @@ repo/
 8. **Documents** — upload, versioning, verify, link constraint
 9. **Notifications** — Vercel Cron ยิง `/api/cron/*` ตามรอบ, multi-channel (in-app/LINE/email)
 10. **Audit/Activity logs** — ให้ครอบทุกโมดูลก่อนหน้า (retrofit helper เข้าไปทุก write endpoint)
-11. **web-admin UI** — ทำตาม role-based menu, deploy แยก Vercel project
-12. **web-public UI** — property listing (อ่านตรงผ่าน `supabase-js` + RLS) + booking form → เชื่อม `/api/public/*` endpoints, deploy แยก Vercel project
+11. **Admin UI** — ทำใน `app/(admin)/admin/*` ตาม role-based menu
+12. **Public UI** — ทำใน `app/(public)/*` property listing (อ่านตรงผ่าน `supabase-js` + RLS) + booking form → เชื่อม `/api/public/*` endpoints
+13. **Deploy** — push ขึ้น Vercel project เดียว, ตั้ง custom domain, เช็ค `robots.txt` กัน index route `/admin`
 
 ---
 
@@ -386,7 +417,9 @@ repo/
 - **Rate limiting:** โดยเฉพาะ `/api/public/*` endpoints (กัน spam lead/appointment) — ใช้ Vercel middleware หรือ Upstash Rate Limit (serverless-friendly)
 - **File validation:** จำกัดชนิดไฟล์/ขนาดตอน upload เข้า Supabase Storage, ตั้ง bucket policy แยก public (รูปทรัพย์) กับ private (เอกสารอ่อนไหว เช่น โฉนด/บัตรประชาชน)
 - **i18n:** รองรับ ไทย/อังกฤษ ทั้ง property listing และ UI (ตาม `language` ของ user)
-- **Testing:** unit test ให้ policy/RBAC logic และ business rules ในตาราง section 5 เป็นอันดับแรก (จุดเสี่ยงสุด)
+- **SEO isolation:** `app/(admin)` layout ต้องใส่ `export const metadata = { robots: { index: false, follow: false } }` และเพิ่ม `Disallow: /admin` ใน `robots.txt` เพื่อกันไม่ให้ search engine เก็บ index หน้าแอดมิน
+- **Bundle isolation:** ห้าม import component จาก `components/admin/*` เข้ามาใช้ใน `app/(public)/*` (และกลับกัน) เพื่อให้ Next.js code-split แยก bundle กันจริง แม้จะ deploy รวม app เดียว
+- **Testing:** unit test ให้ policy/RBAC logic และ business rules ในตาราง section 5 เป็นอันดับแรก (จุดเสี่ยงสุด) และเพิ่ม integration test ยืนยันว่า middleware บล็อกผู้ใช้ไม่ login หรือ role ไม่พอ ไม่ให้เข้า `/admin/*` ได้จริง
 
 ---
 
@@ -396,5 +429,6 @@ repo/
 - ทุก endpoint ที่แก้ไข sensitive data (owners, customers, users) ต้องเช็คว่ามี audit log helper ครอบหรือยังก่อน merge
 - ห้าม trust `role` หรือ field-visibility ใดๆ ที่ส่งมาจาก client — ต้อง derive จาก Supabase JWT ที่ `api` verify เองเท่านั้น
 - เขียน seed script (Prisma seed) สร้าง user ตัวอย่างครบ 3 role ไว้ตั้งแต่ milestone 1 เพื่อทดสอบ RBAC ได้ทันที
-- ตั้งค่า environment variable แยกชัดเจนต่อ Vercel project ทั้ง 3 ตัว (`DATABASE_URL` แบบ pooler, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — เก็บใน `api` เท่านั้น ห้ามหลุดไปที่ frontend)
-- ทุก migration ที่แตะ RLS policy ต้องมี test ยืนยันว่า role ที่ไม่ควรเข้าถึงได้ ถูกบล็อกจริงที่ระดับ DB ไม่ใช่แค่ที่ `api`
+- ตั้งค่า environment variable ใน Vercel project เดียว โดยแยกชัดเจนว่าตัวไหนใช้ได้ที่ server-side เท่านั้น: `DATABASE_URL` แบบ pooler, `SUPABASE_SERVICE_ROLE_KEY` **ห้ามมี prefix `NEXT_PUBLIC_` เด็ดขาด** เพราะจะถูกฝังลง client bundle ทันที ส่วน `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` เท่านั้นที่ปลอดภัยจะ expose ให้ client ใช้ (คู่กับ RLS)
+- ทุก migration ที่แตะ RLS policy ต้องมี test ยืนยันว่า role ที่ไม่ควรเข้าถึงได้ ถูกบล็อกจริงที่ระดับ DB ไม่ใช่แค่ที่ API layer
+- เพราะรวมเป็น app เดียวแล้ว **ทุก PR ที่เพิ่ม route ใหม่ใน `app/(admin)/*` หรือ `app/api/*`** ต้องเช็ค checklist สั้นๆ ก่อน merge: (1) อยู่ใน route group ที่ถูกต้อง (2) มี `requirePermission()` เรียกใน route handler จริง ไม่ใช่พึ่ง middleware อย่างเดียว (3) ไม่ import component ข้าม `admin`/`public`
